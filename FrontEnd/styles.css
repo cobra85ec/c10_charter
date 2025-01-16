@@ -1,0 +1,266 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 20px;
+    background-color: #f9f9f9;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+h1 {
+    text-align: center;
+}
+#tablesSection {
+    margin-top: 20px;
+    width: 80%;
+    max-width: 1000px;
+}
+.table-section {
+    background-color: #fff;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+.table-number {
+    font-size: 22px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.guest-list {
+    margin-bottom: 10px;
+}
+.guest-item {
+    font-size: 18px;
+    margin: 5px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.guest-name {
+    flex-grow: 1;
+    padding-right: 10px;
+}
+.guest-actions button,
+.table-actions button {
+    background-color: #28a745;
+    color: white;
+    padding: 8px 16px;
+    margin: 5px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.guest-actions button:hover,
+.table-actions button:hover {
+    background-color: #218838;
+}
+.table-actions button {
+    background-color: #dc3545;
+}
+.table-actions button:hover {
+    background-color: #c82333;
+}
+.edit-button {
+    background-color: #ffc107;
+    color: white;
+}
+.edit-button:hover {
+    background-color: #e0a800;
+}
+.delete-all-button {
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    margin-top: 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    position: absolute;
+    left: 20px;
+}
+.delete-all-button:hover {
+    background-color: #c82333;
+}
+.save-button {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.save-button:hover {
+    background-color: #0056b3;
+}
+button {
+    cursor: pointer;
+}
+.add-table-button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    margin-top: 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.add-table-button:hover {
+    background-color: #0056b3;
+}
+.add-head-table-button {
+    background-color: #6f42c1;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 10px;
+}
+.add-head-table-button:hover {
+    background-color: #5936a1;
+}
+.guest-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+.guest-name {
+    margin-right: 10px;
+}
+.guest-item button {
+    border-radius: 50%;
+    padding: 8px;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+    margin-left: 5px;
+    transition: all 0.3s ease;
+}
+.delete-button {
+    background-color: #dc3545;
+    color: white;
+}
+.delete-button:hover {
+    background-color: #c82333;
+    transform: scale(1.1);
+}
+.edit-button {
+    background-color: #ffc107;
+    color: white;
+}
+.edit-button:hover {
+    background-color: #e0a800;
+    transform: scale(1.1);
+}
+
+/* Styles for textarea */
+textarea {
+    width: 100%;
+    height: 120px;
+    font-size: 16px;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+    resize: vertical;
+}
+
+/* Styles for dropdown menu */
+select {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+select:hover {
+    border-color: #007bff;
+}
+
+/* Bulk Add button styles */
+.bulk-add-section button {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.bulk-add-section button:hover {
+    background-color: #218838;
+}
+
+/* Update Title Button Styles */
+.edit-title-section button {
+    background-color: #17a2b8;
+    color: white;
+    padding: 10px 20px;
+    font-size: 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.edit-title-section button:hover {
+    background-color: #138496;
+}
+
+/* Styles for collapsible tables */
+.collapsible {
+    background-color: #007bff;
+    color: white;
+    cursor: pointer;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    text-align: left;
+    outline: none;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+.collapsible:hover {
+    background-color: #0056b3;
+}
+
+.collapsible:after {
+    content: '\25bc'; /* Down arrow */
+    float: right;
+    margin-left: 5px;
+}
+
+.collapsible.active:after {
+    content: '\25b2'; /* Up arrow */
+}
+
+.content {
+    padding: 0 15px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.content.show {
+    max-height: 500px; /* Set an appropriate max height */
+}
