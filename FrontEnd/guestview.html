@@ -19,12 +19,12 @@
         h1 {
             text-align: center;
         }
-        .search-bar {
+        .event-search {
             margin: 20px 0;
-            width: 80%;
-            max-width: 600px;
+            width: 100%;
+            max-width: 400px;
         }
-        .search-bar input {
+        .event-search input {
             width: 100%;
             padding: 10px;
             font-size: 16px;
@@ -43,7 +43,6 @@
             margin-bottom: 20px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            text-align: center;
         }
         .table-number {
             font-size: 22px;
@@ -52,131 +51,127 @@
             margin-bottom: 10px;
         }
         .guest-list {
-            padding-left: 0;
-            list-style-type: none;
+            list-style: none;
+            padding: 0;
         }
         .guest-item {
             font-size: 18px;
             margin: 5px 0;
         }
+        .guest-search {
+            margin: 20px 0;
+            width: 100%;
+            max-width: 400px;
+        }
+        .guest-search input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body>
 
-<h1 id="pageTitle">Guest View - Event Tables</h1>
-<div class="search-bar">
-    <input type="text" id="searchInput" placeholder="Search for a guest..." oninput="filterGuests()">
+<h1>Guest View - Event Tables</h1>
+<div id="eventSearchContainer" class="event-search" style="display: block;">
+    <input type="text" id="eventNameInput" placeholder="Enter event name" onkeydown="if(event.key==='Enter') loadEvent()">
+    <button onclick="loadEvent()">Search Event</button>
 </div>
-<div class="tables-container" id="tablesContainer">
-    <!-- Tables will be dynamically rendered here -->
+<div id="guestSearchContainer" class="guest-search" style="display: none;">
+    <input type="text" id="guestSearchInput" placeholder="Search for a guest..." oninput="filterGuests()">
 </div>
+<div id="tablesContainer" class="tables-container"></div>
 
 <script>
-    function loadGuestView() {
+    function loadEvent() {
+        const eventName = document.getElementById("eventNameInput").value.trim().toLowerCase();
+        const eventsData = JSON.parse(localStorage.getItem("eventsData"));
         const tablesContainer = document.getElementById("tablesContainer");
-        const storedData = JSON.parse(localStorage.getItem("eventData"));
+        const eventSearchContainer = document.getElementById("eventSearchContainer");
+        const guestSearchContainer = document.getElementById("guestSearchContainer");
+        tablesContainer.innerHTML = ""; // Clear previous content
 
-        // Load title from localStorage
-        const storedTitle = localStorage.getItem("pageTitle");
-        if (storedTitle) {
-            document.getElementById("pageTitle").textContent = storedTitle;
-        }
-
-        if (storedData) {
-            // Display Head Table
-            if (storedData.headTable && storedData.headTable.length > 0) {
-                const headTableSection = document.createElement("div");
-                headTableSection.classList.add("table-section");
-
-                let headTableHTML = `<div class='table-number'>Head Table</div>`;
-                headTableHTML += `<ul class='guest-list'>`;
-
-                storedData.headTable.forEach(guest => {
-                    headTableHTML += `<li class='guest-item'>${guest}</li>`;
-                });
-
-                headTableHTML += `</ul>`;
-                headTableSection.innerHTML = headTableHTML;
-                tablesContainer.appendChild(headTableSection);
-            }
-
-            // Display Regular Tables
-            if (storedData.tables && storedData.tables.length > 0) {
-                storedData.tables.forEach(table => {
-                    const tableSection = document.createElement("div");
-                    tableSection.classList.add("table-section");
-
-                    let tableHTML = `<div class='table-number'>Table ${table.id}</div>`;
-                    tableHTML += `<ul class='guest-list'>`;
-
-                    table.guests.forEach(guest => {
-                        tableHTML += `<li class='guest-item'>${guest}</li>`;
-                    });
-
-                    tableHTML += `</ul>`;
-                    tableSection.innerHTML = tableHTML;
-                    tablesContainer.appendChild(tableSection);
-                });
-            } else {
-                tablesContainer.innerHTML = `<p>No tables or guests available to display.</p>`;
-            }
-        } else {
-            tablesContainer.innerHTML = `<p>No event data found.</p>`;
-        }
-    }
-
-    function filterGuests() {
-        const searchInput = document.getElementById("searchInput").value.toLowerCase();
-        const guestItems = document.querySelectorAll(".guest-item");
-        const tablesContainer = document.getElementById("tablesContainer");
-
-        // Clear the current table display
-        tablesContainer.innerHTML = '';
-
-        // Create a map of results grouped by table
-        const results = {};
-
-        guestItems.forEach(item => {
-            const guestName = item.textContent.toLowerCase();
-            if (guestName.includes(searchInput)) {
-                // Find the table number from the parent `.table-section`
-                const tableNumber = item.closest(".table-section").querySelector(".table-number").textContent;
-
-                // Group guests by table
-                if (!results[tableNumber]) {
-                    results[tableNumber] = [];
-                }
-                results[tableNumber].push(item.textContent);
-            }
-        });
-
-        // If input is empty, reload the full view
-        if (!searchInput) {
-            loadGuestView();
+        if (!eventName) {
+            alert("Please enter an event name.");
             return;
         }
 
-        // Display results if there are matches
-        if (Object.keys(results).length > 0) {
-            for (const tableNumber in results) {
-                const resultSection = document.createElement("div");
-                resultSection.classList.add("table-section");
-                resultSection.innerHTML = `
-                    <div class="table-number">${tableNumber}</div>
-                    <ul class="guest-list">
-                        ${results[tableNumber].map(guest => `<li class="guest-item">${guest}</li>`).join('')}
-                    </ul>
-                `;
-                tablesContainer.appendChild(resultSection);
+        if (eventsData) {
+            const eventKey = Object.keys(eventsData).find(key => key.toLowerCase() === eventName);
+            if (eventKey) {
+                const event = eventsData[eventKey];
+
+                // Hide the event search bar when an event is successfully found
+                eventSearchContainer.style.display = "none";
+
+                // Display guest search bar
+                guestSearchContainer.style.display = "block";
+
+                // Display event title
+                const titleElement = document.createElement("h2");
+                titleElement.textContent = event.title || `Event: ${eventKey}`;
+                tablesContainer.appendChild(titleElement);
+
+                // Display head table if exists
+                if (event.headTable && event.headTable.length > 0) {
+                    const headTableSection = document.createElement("div");
+                    headTableSection.classList.add("table-section");
+                    headTableSection.setAttribute("data-table-id", "head");
+                    headTableSection.innerHTML = `
+                        <div class="table-number">Head Table</div>
+                        <ul class="guest-list">
+                            ${event.headTable.map(guest => `<li class="guest-item">${guest}</li>`).join("")}
+                        </ul>
+                    `;
+                    tablesContainer.appendChild(headTableSection);
+                }
+
+                // Display regular tables
+                event.tables.forEach(table => {
+                    const tableSection = document.createElement("div");
+                    tableSection.classList.add("table-section");
+                    tableSection.setAttribute("data-table-id", table.id);
+                    tableSection.innerHTML = `
+                        <div class="table-number">Table ${table.id}</div>
+                        <ul class="guest-list">
+                            ${table.guests.map(guest => `<li class="guest-item">${guest}</li>`).join("")}
+                        </ul>
+                    `;
+                    tablesContainer.appendChild(tableSection);
+                });
+
+                return;
             }
-        } else {
-            // If no matches found, show "No guests found" message
-            tablesContainer.innerHTML = '<p>No guests found matching your search.</p>';
         }
+
+        alert("Event not found. Please check the event name.");
     }
 
-    // Initialize the page
-    window.onload = loadGuestView;
+    function filterGuests() {
+        const searchInput = document.getElementById("guestSearchInput").value.toLowerCase();
+        const tableSections = document.querySelectorAll(".table-section");
+
+        tableSections.forEach(table => {
+            const guestItems = table.querySelectorAll(".guest-item");
+            let tableHasGuest = false;
+
+            guestItems.forEach(item => {
+                const guestName = item.textContent.toLowerCase();
+                if (guestName.includes(searchInput)) {
+                    item.style.display = "";
+                    tableHasGuest = true;
+                } else {
+                    item.style.display = "none";
+                }
+            });
+
+            // Show or hide the entire table based on whether it has a matching guest
+            table.style.display = tableHasGuest ? "block" : "none";
+        });
+    }
 </script>
 
 </body>

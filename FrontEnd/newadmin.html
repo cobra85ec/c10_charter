@@ -3,13 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Manage Event Tables</title>
+    <title>Admin - Manage Multiple Events</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <h1>Admin - Manage Event Tables</h1>
+
+<!-- Event Selection Section -->
+<div class="event-selection">
+    <h2>Select or Create Event</h2>
+    <select id="eventSelect" onchange="switchEvent()">
+        <option value="" disabled selected>Select an Event</option>
+    </select>
+    <button onclick="createNewEvent()">Create New Event</button>
+    <button onclick="deleteEvent()" class="delete-all-button">Delete Selected Event</button>
+</div>
 
 <!-- Editable Title Section -->
 <div class="edit-title-section">
@@ -18,8 +28,11 @@
     <button onclick="updatePageTitle()">Update Title</button>
 </div>
 
-<!-- Button to add new table -->
-<button class="add-table-button" onclick="addTable()">Add New Table</button>
+<!-- Button container for add table and add head table -->
+<div class="button-container">
+    <button class="add-table-button" onclick="addTable()">Add New Table</button>
+    <button class="add-head-table-button" onclick="addHeadTable()">Add Head Table</button>
+</div>
 
 <!-- Bulk add guest section -->
 <div class="bulk-add-section">
@@ -33,111 +46,127 @@
 <div id="tablesSection"></div>
 
 <!-- Save button for admin to save data -->
-<button class="save-button" onclick="saveData()">Save Data</button>
-
-<!-- Button to add head table -->
-<button class="add-head-table-button" onclick="addHeadTable()">Add Head Table</button>
-
-<!-- Button to delete all tables and guests (moved to the left) -->
-<button class="delete-all-button" onclick="deleteAllTables()">Delete All</button>
+<div style="display: flex; gap: 10px; justify-content: flex-end; position: fixed; bottom: 20px; right: 20px;">
+    <button class="save-button" onclick="saveData()">Save Data</button>
+    <button class="delete-all-button" onclick="deleteEvent()">Delete Selected Event</button>
+</div>
 
 <script>
-    let eventData = {
-        headTable: [],
-        tables: []
-    };
+    let eventsData = {};
+    let currentEvent = null;
 
-    // Load event data and page title from localStorage
     function loadData() {
-        const storedData = JSON.parse(localStorage.getItem("eventData"));
-        const storedTitle = localStorage.getItem("pageTitle");
-
+        const storedData = JSON.parse(localStorage.getItem("eventsData"));
         if (storedData) {
-            eventData = storedData;
-            if (storedData.headTable.length > 0) {
-                displayHeadTable();
-            }
-            storedData.tables.forEach(table => {
-                createTable(table.id, table.guests);
-            });
+            eventsData = storedData;
+            updateEventSelect();
         }
-
-        if (storedTitle) {
-            document.getElementById("pageTitleInput").value = storedTitle;
-        }
-
-        updateBulkTableSelect();
     }
 
-    // Update the Guest View title
+    function updateEventSelect() {
+        const eventSelect = document.getElementById("eventSelect");
+        eventSelect.innerHTML = '<option value="" disabled selected>Select an Event</option>';
+
+        for (const eventName in eventsData) {
+            const option = document.createElement("option");
+            option.value = eventName;
+            option.textContent = eventName;
+            eventSelect.appendChild(option);
+        }
+    }
+
+    function switchEvent() {
+        const eventSelect = document.getElementById("eventSelect");
+        const selectedEvent = eventSelect.value;
+
+        if (selectedEvent) {
+            currentEvent = selectedEvent;
+            document.getElementById("pageTitleInput").value = eventsData[selectedEvent].title || "";
+            loadEventTables();
+        }
+    }
+
+    function createNewEvent() {
+        const eventName = prompt("Enter a name for the new event:").trim();
+
+        if (eventName && !eventsData[eventName]) {
+            eventsData[eventName] = { title: "", headTable: [], tables: [] };
+            currentEvent = eventName;
+            updateEventSelect();
+            document.getElementById("eventSelect").value = eventName;
+            switchEvent();
+        } else if (eventsData[eventName]) {
+            alert("An event with this name already exists.");
+        }
+    }
+
+    function deleteEvent() {
+        if (currentEvent && confirm("Are you sure you want to delete this event?")) {
+            delete eventsData[currentEvent];
+            currentEvent = null;
+            updateEventSelect();
+            document.getElementById("tablesSection").innerHTML = "";
+            document.getElementById("pageTitleInput").value = "";
+            saveData();
+        }
+    }
+
     function updatePageTitle() {
-        const pageTitleInput = document.getElementById("pageTitleInput").value.trim();
-        if (pageTitleInput) {
-            localStorage.setItem("pageTitle", pageTitleInput);
+        if (currentEvent) {
+            const pageTitleInput = document.getElementById("pageTitleInput").value.trim();
+            eventsData[currentEvent].title = pageTitleInput;
             alert("Guest View title updated successfully!");
         }
     }
 
-    // Add Head Table
-    function addHeadTable() {
-        if (eventData.headTable.length === 0) {
-            eventData.headTable = [];
-            displayHeadTable();
+    function loadEventTables() {
+        if (currentEvent) {
+            const tablesSection = document.getElementById("tablesSection");
+            tablesSection.innerHTML = "";
+
+            const event = eventsData[currentEvent];
+
+            if (event.headTable.length > 0) {
+                displayHeadTable();
+            }
+
+            event.tables.forEach(table => {
+                createTable(table.id, table.guests);
+            });
+
+            updateBulkTableSelect();
         }
     }
 
-    // Display Head Table Section
-    function displayHeadTable() {
-        const tablesSection = document.getElementById("tablesSection");
-
-        // Remove existing head table if any
-        const existingHeadTable = document.getElementById("headTableSection");
-        if (existingHeadTable) {
-            existingHeadTable.remove();
-        }
-
-        const headTableSection = document.createElement("div");
-        headTableSection.id = "headTableSection";
-        headTableSection.classList.add("table-section");
-
-        let headTableHTML = `
-            <div class="table-number">Head Table</div>
-            <div class="guest-list" id="headTableGuests">
-                ${eventData.headTable.map(guest => `
-                    <div class="guest-item">
-                        <span class="guest-name">${guest}</span>
-                        <button class="delete-button" onclick="removeHeadGuest('${guest}')"><i class="fas fa-trash-alt"></i></button>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="guest-actions">
-                <input type="text" class="guest-input" id="headGuestInput" placeholder="Add a guest">
-                <button onclick="addHeadGuest()">Add Guest</button>
-            </div>
-        `;
-
-        headTableSection.innerHTML = headTableHTML;
-        tablesSection.insertAdjacentElement('beforebegin', headTableSection);
+    function saveData() {
+        localStorage.setItem("eventsData", JSON.stringify(eventsData));
+        alert("Data saved successfully!");
     }
 
-    // Add Guest to Head Table
-    function addHeadGuest() {
-        const guestInput = document.getElementById("headGuestInput");
-        const guestName = guestInput.value.trim();
-        if (guestName) {
-            eventData.headTable.push(guestName);
-            guestInput.value = '';
-            displayHeadTable();
+    function addTable() {
+        if (currentEvent) {
+            const event = eventsData[currentEvent];
+            const newTableId = event.tables.length ? Math.max(...event.tables.map(t => t.id)) + 1 : 1;
+            event.tables.push({ id: newTableId, guests: [] });
+            createTable(newTableId);
+        } else {
+            alert("Please select or create an event first.");
         }
     }
 
-    // Remove Guest from Head Table
-    function removeHeadGuest(guestName) {
-        eventData.headTable = eventData.headTable.filter(guest => guest !== guestName);
-        displayHeadTable();
+    function toggleTable(tableId) {
+        const tableContent = document.getElementById(`table-${tableId}`);
+        const button = tableContent.previousElementSibling.querySelector('.collapsible');
+
+        if (tableContent.classList.contains('show')) {
+            tableContent.classList.remove('show');
+            button.textContent = 'Expand';
+        } else {
+            tableContent.classList.add('show');
+            button.textContent = 'Collapse';
+        }
     }
 
-    // Create a table section
     function createTable(tableId, guests = []) {
         const tablesSection = document.getElementById("tablesSection");
 
@@ -146,8 +175,11 @@
         tableSection.setAttribute("data-table-id", tableId);
 
         let tableHTML = `
-            <div class="table-number">Table ${tableId}</div>
-            <div class="guest-list" id="table-${tableId}">
+            <div class="table-number">
+                Table ${tableId}
+                <button class="collapsible" onclick="toggleTable(${tableId})">Collapse</button>
+            </div>
+            <div class="guest-list content" id="table-${tableId}">
         `;
 
         guests.forEach(guest => {
@@ -176,77 +208,37 @@
         updateBulkTableSelect();
     }
 
-    // Add new table
-    function addTable() {
-        const newTableId = eventData.tables.length ? Math.max(...eventData.tables.map(t => t.id)) + 1 : 1;
-        eventData.tables.push({ id: newTableId, guests: [] });
-        createTable(newTableId);
-    }
-
-    // Add guest to a specific table
-    function addGuest(tableId) {
-        const guestInput = document.getElementById(`guest-input-${tableId}`);
-        const guestName = guestInput.value.trim();
-        if (guestName) {
-            const table = eventData.tables.find(t => t.id === tableId);
-            table.guests.push(guestName);
-            guestInput.value = ''; // Clear input field
-            updateTableDisplay(tableId);
-        }
-    }
-
-    // Add multiple guests to a specific table
     function addBulkGuests() {
-        const guestInput = document.getElementById("bulkGuestInput").value.trim();
-        const tableId = parseInt(document.getElementById("bulkTableSelect").value);
+        if (currentEvent) {
+            const bulkInput = document.getElementById("bulkGuestInput").value.trim();
+            const selectedTableId = parseInt(document.getElementById("bulkTableSelect").value);
 
-        if (guestInput && tableId) {
-            const guestNames = guestInput.split("\n").map(name => name.trim()).filter(name => name !== "");
-            const table = eventData.tables.find(t => t.id === tableId);
+            if (bulkInput && selectedTableId) {
+                const guestNames = bulkInput.split("\n").map(name => name.trim()).filter(name => name !== "");
+                const table = eventsData[currentEvent].tables.find(t => t.id === selectedTableId);
 
-            if (table) {
-                table.guests.push(...guestNames);
-                document.getElementById("bulkGuestInput").value = ""; // Clear input field
-                updateTableDisplay(tableId);
+                if (table) {
+                    table.guests.push(...guestNames);
+                    document.getElementById("bulkGuestInput").value = "";
+                    updateTableDisplay(selectedTableId);
+                    alert(`${guestNames.length} guest(s) added to Table ${selectedTableId}!`);
+                } else {
+                    alert("Table not found. Please select a valid table.");
+                }
+            } else {
+                alert("Please provide guest names and select a table.");
             }
+        } else {
+            alert("Please select or create an event first.");
         }
     }
 
-    // Remove guest from a table
-    function removeGuest(tableId, guestName) {
-        if (confirm(`Are you sure you want to delete guest "${guestName}"?`)) {
-            const table = eventData.tables.find(t => t.id === tableId);
-            table.guests = table.guests.filter(guest => guest !== guestName);
-            updateTableDisplay(tableId);
-        }
-    }
-
-    // Edit a guest's name
-    function editGuest(tableId, oldGuestName) {
-        const newGuestName = prompt("Enter the new guest name:", oldGuestName);
-        if (newGuestName && newGuestName !== oldGuestName) {
-            const table = eventData.tables.find(t => t.id === tableId);
-            const guestIndex = table.guests.indexOf(oldGuestName);
-            if (guestIndex !== -1) {
-                table.guests[guestIndex] = newGuestName;
-                updateTableDisplay(tableId);
-            }
-        }
-    }
-
-    // Remove entire table
-    function removeTable(tableId) {
-        if (confirm("Are you sure you want to delete this table?")) {
-            eventData.tables = eventData.tables.filter(table => table.id !== tableId);
-            updateTablesSection();
-        }
-    }
-
-    // Update table display
     function updateTableDisplay(tableId) {
-        const table = eventData.tables.find(t => t.id === tableId);
+        const table = eventsData[currentEvent].tables.find(t => t.id === tableId);
         const tableSection = document.querySelector(`[data-table-id="${tableId}"]`);
-        tableSection.querySelector('.guest-list').innerHTML = '';
+        const guestList = tableSection.querySelector(".guest-list");
+        guestList.innerHTML = "";
+
         table.guests.forEach(guest => {
             const guestHTML = `
                 <div class="guest-item">
@@ -255,52 +247,25 @@
                     <button class="edit-button" onclick="editGuest(${tableId}, '${guest}')"><i class="fas fa-edit"></i></button>
                 </div>
             `;
-            tableSection.querySelector('.guest-list').innerHTML += guestHTML;
+            guestList.innerHTML += guestHTML;
         });
     }
 
-    // Update tables section after removing a table
-    function updateTablesSection() {
-        const tablesSection = document.getElementById("tablesSection");
-        tablesSection.innerHTML = '';
-        eventData.tables.forEach(table => {
-            createTable(table.id, table.guests);
-        });
-        updateBulkTableSelect();
-    }
-
-    // Update the dropdown for bulk table selection
     function updateBulkTableSelect() {
         const bulkTableSelect = document.getElementById("bulkTableSelect");
         bulkTableSelect.innerHTML = '<option value="" disabled selected>Select a table</option>';
 
-        eventData.tables.forEach(table => {
-            const option = document.createElement("option");
-            option.value = table.id;
-            option.textContent = `Table ${table.id}`;
-            bulkTableSelect.appendChild(option);
-        });
-    }
-
-    // Save data to localStorage
-    function saveData() {
-        localStorage.setItem("eventData", JSON.stringify(eventData));
-        alert('Data saved successfully!');
-    }
-
-    // Delete all tables and guests
-    function deleteAllTables() {
-        if (confirm("Are you sure you want to delete all tables and guests?")) {
-            eventData.tables = [];
-            eventData.headTable = [];
-            updateTablesSection();
-            displayHeadTable();
-            saveData();  // Save the empty data to localStorage
-            alert("All tables and guests have been deleted.");
+        if (currentEvent) {
+            const event = eventsData[currentEvent];
+            event.tables.forEach(table => {
+                const option = document.createElement("option");
+                option.value = table.id;
+                option.textContent = `Table ${table.id}`;
+                bulkTableSelect.appendChild(option);
+            });
         }
     }
 
-    // Initialize page
     window.onload = loadData;
 </script>
 
