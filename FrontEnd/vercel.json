@@ -1,0 +1,22 @@
+{
+    "version": 2,
+    "builds": [
+      {
+        "src": "index.html",
+        "use": "@vercel/static"
+      },
+      {
+        "src": "second.html",
+        "use": "@vercel/static"
+      },
+      {
+        "src": "style.css",
+        "use": "@vercel/static"
+      },
+      {
+        "src": "secondStyle.css",
+        "use": "@vercel/static"
+      }
+    ]
+  }
+  
