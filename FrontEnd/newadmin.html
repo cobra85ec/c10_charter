@@ -6,6 +6,7 @@
     <title>Admin - Manage Multiple Events</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="loader.css">
 </head>
 <body>
 
@@ -17,22 +18,22 @@
     <select id="eventSelect" onchange="switchEvent()">
         <option value="" disabled selected>Select an Event</option>
     </select>
-    <button onclick="createNewEvent()">Create New Event</button>
+    <button onclick="createNewEvent()" class="delete-all-button">Create New Event</button>
     <button onclick="deleteEvent()" class="delete-all-button">Delete Selected Event</button>
 </div>
 
-<!-- Editable Title Section -->
+<!-- Editable Title Section
 <div class="edit-title-section">
-    <h2>Edit Guest View Title</h2>
+    <h2>Edit Event View Title</h2>
     <input type="text" id="pageTitleInput" placeholder="Enter Guest View Title">
     <button onclick="updatePageTitle()">Update Title</button>
 </div>
 
-<!-- Button container for add table and add head table -->
+ Button container for add table and add head table
 <div class="button-container">
     <button class="add-table-button" onclick="addTable()">Add New Table</button>
     <button class="add-head-table-button" onclick="addHeadTable()">Add Head Table</button>
-</div>
+</div>  -->
 
 <!-- Bulk add guest section -->
 <div class="bulk-add-section">
@@ -40,6 +41,17 @@
     <textarea id="bulkGuestInput" placeholder="Enter guest names, one per line..."></textarea>
     <select id="bulkTableSelect"></select>
     <button onclick="addBulkGuests()">Add Guests to Table</button>
+</div>
+
+<!-- Full Page Loader -->
+<div class="full-page-loader" id="loader" style="display: none;">
+    <div class="spinner">
+        <div class="rect1"></div>
+        <div class="rect2"></div>
+        <div class="rect3"></div>
+        <div class="rect4"></div>
+        <div class="rect5"></div>
+    </div>
 </div>
 
 <!-- Section to display tables and guests -->
@@ -51,195 +63,398 @@
     <button class="delete-all-button" onclick="deleteEvent()">Delete Selected Event</button>
 </div>
 
+<div id="editGuestModal" style="display: none;">
+    <h3>Edit Guest</h3>
+    <input type="text" id="editGuestInput" />
+    <button onclick="saveGuestEdit()">Save Changes</button>
+    <button onclick="closeEditModal()">Cancel</button>
+</div>
+<!-- Modal overlay for background blur -->
+<div id="modalOverlay" class="modal-overlay" onclick="closeEditModal()"></div>
 <script>
-    let eventsData = {};
+    let eventsData = [];
     let currentEvent = null;
 
-    function loadData() {
-        const storedData = JSON.parse(localStorage.getItem("eventsData"));
-        if (storedData) {
-            eventsData = storedData;
-            updateEventSelect();
-        }
+    // Show loader
+    function showLoader() {
+        document.getElementById('loader').style.display = 'flex';
     }
 
+    // Hide loader
+    function hideLoader() {
+        document.getElementById('loader').style.display = 'none';
+    }
+
+    async function addBulkGuests() {
+        const guestInput = document.getElementById('bulkGuestInput').value.trim();
+        const selectedTableId = parseInt(document.getElementById('bulkTableSelect').value);
+
+        if (!guestInput || isNaN(selectedTableId)) {
+            alert('Please select a table and enter guest names.');
+            return;
+        }
+
+        // Split the guest names from textarea into an array
+        const guestNames = guestInput.split('\n').map(name => name.trim()).filter(name => name);
+
+        // Send the data to the server
+        fetch(`http://localhost:3000/event/${currentEvent}/table/${selectedTableId}/guest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ guests: guestNames })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(`Guests added to table ${selectedTableId}.`);
+            console.log(data);
+            switchEvent();
+        })
+        .catch(error => {
+            alert('An error occurred while adding guests.');
+            console.error(error);
+        });
+    }
+
+    async function loadEventsIntoDropdown(apiEndpoint, dropdownId) {
+    try {
+        // Show loader
+        showLoader();
+
+        // Fetch the event data from the server
+        const response = await fetch(apiEndpoint);
+        const data = await response.json();
+        eventsData = data.events
+
+        if (data && data.events) {
+            // Get the dropdown element by its ID
+            const dropdown = document.getElementById(dropdownId);
+            dropdown.innerHTML = '<option value="" disabled selected>Select an Event</option>'; // Default option
+
+            // Loop through the events data and create a new option for each event
+            data.events.forEach(event => {
+                const option = document.createElement("option");
+                option.value = event.eventId;
+                option.textContent = `${event.eventId}`;
+                dropdown.appendChild(option);
+            });
+            showLoader();
+            populateTableSelect();
+            hideLoader();
+        } else {
+            alert("No events found.");
+        }
+    } catch (error) {
+        console.error("Error loading events:", error);
+        alert("Error loading events. Please try again.");
+    } finally {
+        // Hide loader after the API call is complete
+        hideLoader();
+    }
+}
+
+    // Update the dropdown for bulk table selection
+    function updateBulkTableSelect() {
+        const bulkTableSelect = document.getElementById("bulkTableSelect");
+        bulkTableSelect.innerHTML = '<option value="" disabled selected>Select a table</option>';
+
+        eventData.tables.forEach(table => {
+            const option = document.createElement("option");
+            option.value = table.id;
+            option.textContent = `Table ${table.id}`;
+            bulkTableSelect.appendChild(option);
+        });
+    }
+
+    // Update event select dropdown
     function updateEventSelect() {
         const eventSelect = document.getElementById("eventSelect");
         eventSelect.innerHTML = '<option value="" disabled selected>Select an Event</option>';
 
-        for (const eventName in eventsData) {
+        for (const event of eventsData) {
             const option = document.createElement("option");
-            option.value = eventName;
-            option.textContent = eventName;
+            option.value = event.eventId;
+            option.textContent = event.title || `Event ${event.eventId}`;
             eventSelect.appendChild(option);
         }
     }
 
-    function switchEvent() {
+    // Switch event and load its tables and guests
+    async function switchEvent() {
+    try {
+        showLoader(); // Show loader before making the API request
+        
         const eventSelect = document.getElementById("eventSelect");
-        const selectedEvent = eventSelect.value;
+        const eventId = eventSelect.value;  // Get the selected event ID
+        
+        currentEvent = eventId;  // Set the current event ID
 
-        if (selectedEvent) {
-            currentEvent = selectedEvent;
-            document.getElementById("pageTitleInput").value = eventsData[selectedEvent].title || "";
-            loadEventTables();
+        // Fetch the event details for the selected event
+        const response = await fetch(`http://localhost:3000/event/${eventId}`);
+        
+        if (!response.ok) {
+            throw new Error("Failed to fetch event data.");
         }
-    }
 
-    function createNewEvent() {
+        const data = await response.json();  // Parse the response JSON
+
+        if (data) {
+            const event = data;
+            currentEvent = data.eventId;
+
+            // Clear existing tables and guests in UI
+            document.getElementById("tablesSection").innerHTML = "";
+
+            // Display the headTable (if any)
+            if (event.headTable && event.headTable.length > 0) {
+                displayHeadTable(event);
+            }
+
+            // Display tables and guests for the event
+            if (event.tables && event.tables.length > 0) {
+                event.tables.forEach(table => {
+                    createTable(table.id, table.guests);  // Pass each table's id and guests to the createTable function
+                });
+            } else {
+                alert("No tables found for this event.");
+            }
+        } else {
+            alert('Error: Event data is invalid.');
+        }
+    } catch (error) {
+        console.error('Error loading tables for event:', error);
+        alert('Error loading tables. Please try again.');
+    } finally {
+        hideLoader();  // Hide the loader when the process is complete
+    }
+}
+
+    // Create a new event
+    async function createNewEvent() {
         const eventName = prompt("Enter a name for the new event:").trim();
 
-        if (eventName && !eventsData[eventName]) {
-            eventsData[eventName] = { title: "", headTable: [], tables: [] };
-            currentEvent = eventName;
-            updateEventSelect();
-            document.getElementById("eventSelect").value = eventName;
-            switchEvent();
-        } else if (eventsData[eventName]) {
-            alert("An event with this name already exists.");
+        if (eventName) {
+            showLoader();
+            try {
+                const response = await fetch('http://localhost:3000/event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: eventName })
+                });
+
+                const newEvent = await response.json();
+                eventsData[newEvent.eventId] = newEvent;
+                updateEventSelect();
+                switchEvent();
+            } catch (error) {
+                // alert("Error creating event.");
+            } finally {
+                hideLoader();
+            }
         }
     }
 
-    function deleteEvent() {
+    // Delete selected event
+    async function deleteEvent() {
         if (currentEvent && confirm("Are you sure you want to delete this event?")) {
-            delete eventsData[currentEvent];
-            currentEvent = null;
-            updateEventSelect();
-            document.getElementById("tablesSection").innerHTML = "";
-            document.getElementById("pageTitleInput").value = "";
-            saveData();
+            showLoader();
+            try {
+                await fetch(`http://localhost:3000/event/${currentEvent}`, {
+                    method: 'DELETE'
+                });
+                delete eventsData[currentEvent];
+                currentEvent = null;
+                updateEventSelect();
+                document.getElementById("tablesSection").innerHTML = "";
+                document.getElementById("pageTitleInput").value = "";
+            } catch (error) {
+                alert("Error deleting event.");
+            } finally {
+                hideLoader();
+            }
         }
     }
 
-    function updatePageTitle() {
+    // Update page title
+    async function updatePageTitle() {
         if (currentEvent) {
             const pageTitleInput = document.getElementById("pageTitleInput").value.trim();
             eventsData[currentEvent].title = pageTitleInput;
-            alert("Guest View title updated successfully!");
-        }
-    }
-
-    function loadEventTables() {
-        if (currentEvent) {
-            const tablesSection = document.getElementById("tablesSection");
-            tablesSection.innerHTML = "";
-
-            const event = eventsData[currentEvent];
-
-            if (event.headTable.length > 0) {
-                displayHeadTable();
+            showLoader();
+            try {
+                await fetch(`http://localhost:3000/event/${currentEvent}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: pageTitleInput })
+                });
+                alert("Guest View title updated successfully!");
+            } catch (error) {
+                alert("Error updating title.");
+            } finally {
+                hideLoader();
             }
-
-            event.tables.forEach(table => {
-                createTable(table.id, table.guests);
-            });
-
-            updateBulkTableSelect();
         }
     }
 
-    function saveData() {
-        localStorage.setItem("eventsData", JSON.stringify(eventsData));
-        alert("Data saved successfully!");
+    function displayHeadTable(data) {
+    const tablesSection = document.getElementById("tablesSection");
+
+    // Remove existing head table if any
+    const existingHeadTable = document.getElementById("headTableSection");
+    if (existingHeadTable) {
+        existingHeadTable.remove();
     }
 
-    function addTable() {
-        if (currentEvent) {
-            const event = eventsData[currentEvent];
-            const newTableId = event.tables.length ? Math.max(...event.tables.map(t => t.id)) + 1 : 1;
-            event.tables.push({ id: newTableId, guests: [] });
-            createTable(newTableId);
-        } else {
-            alert("Please select or create an event first.");
-        }
-    }
+    const headTableSection = document.createElement("div");
+    headTableSection.id = "headTableSection";
+    headTableSection.classList.add("table-section");
 
-    function toggleTable(tableId) {
-        const tableContent = document.getElementById(`table-${tableId}`);
-        const button = tableContent.previousElementSibling.querySelector('.collapsible');
+    // Assuming headTable is an array with objects that have guests
+    const headTableGuests = data.headTable[0].guests; // Get guests from the first head table object
 
-        if (tableContent.classList.contains('show')) {
-            tableContent.classList.remove('show');
-            button.textContent = 'Expand';
-        } else {
-            tableContent.classList.add('show');
-            button.textContent = 'Collapse';
-        }
-    }
-
-    function createTable(tableId, guests = []) {
-        const tablesSection = document.getElementById("tablesSection");
-
-        const tableSection = document.createElement("div");
-        tableSection.classList.add("table-section");
-        tableSection.setAttribute("data-table-id", tableId);
-
-        let tableHTML = `
-            <div class="table-number">
-                Table ${tableId}
-                <button class="collapsible" onclick="toggleTable(${tableId})">Collapse</button>
-            </div>
-            <div class="guest-list content" id="table-${tableId}">
-        `;
-
-        guests.forEach(guest => {
-            tableHTML += `
+    let headTableHTML = `
+        <div class="table-number">Head Table</div>
+        <div class="guest-list" id="headTableGuests">
+            ${headTableGuests.filter(guest => guest && guest.trim() !== "").map(guest => `
                 <div class="guest-item">
                     <span class="guest-name">${guest}</span>
-                    <button class="delete-button" onclick="removeGuest(${tableId}, '${guest}')"><i class="fas fa-trash-alt"></i></button>
-                    <button class="edit-button" onclick="editGuest(${tableId}, '${guest}')"><i class="fas fa-edit"></i></button>
+                    <button class="edit-button" onclick="editHeadGuest('${guest}')">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="delete-button" onclick="removeHeadGuest('${guest}')">
+                    <i class="fas fa-trash-alt"></i>
+                    </button>
                 </div>
-            `;
-        });
+            `).join('')}
+        </div>
+        <div class="guest-actions">
+            <input type="text" class="guest-input" id="headGuestInput" placeholder="Add a guest">
+            <button onclick="addHeadGuest()">Add Guest</button>
+        </div>
+    `;
 
+    headTableSection.innerHTML = headTableHTML;
+    tablesSection.insertAdjacentElement('beforebegin', headTableSection);
+
+          // <button class="delete-button" onclick="removeHeadGuest('${guest}')">
+                    //     <i class="fas fa-trash-alt"></i>
+                    // </button>
+}
+
+    function createTable(tableId, guests = []) {
+    const tablesSection = document.getElementById("tablesSection");
+
+    const eventTitle = currentEvent;
+
+    // Create the table section for the specific tableId
+    const tableSection = document.createElement("div");
+    tableSection.classList.add("table-section");
+    tableSection.setAttribute("data-table-id", tableId);
+
+    // Create table HTML with event information and guests
+    let tableHTML = `
+        <div class="event-title">
+            <h3>Event: ${eventTitle}</h3>
+        </div>
+        <div class="table-number">Table ${tableId}</div>
+        <div class="guest-list" id="table-${tableId}">
+    `;
+
+    // Add guests to the table
+    guests.forEach(guest => {
         tableHTML += `
-            </div>
-            <div class="guest-actions">
-                <input type="text" class="guest-input" id="guest-input-${tableId}" placeholder="Add a guest">
-                <button onclick="addGuest(${tableId})">Add Guest</button>
-            </div>
-            <div class="table-actions">
-                <button onclick="removeTable(${tableId})">Remove Table</button>
+            <div class="guest-item">
+                <span class="guest-name">${guest}</span>
+                <button class="delete-button" onclick="removeGuest(${tableId}, '${guest}')"><i class="fas fa-trash-alt"></i></button>
+                <button class="edit-button" onclick="editGuest(${tableId}, '${guest}')"><i class="fas fa-edit"></i></button>
             </div>
         `;
+    });
 
-        tableSection.innerHTML = tableHTML;
-        tablesSection.appendChild(tableSection);
-        updateBulkTableSelect();
-    }
+    // Close guest list and add actions for adding/removing guests
+    tableHTML += `
+        </div>
+        <div class="guest-actions">
+            <input type="text" class="guest-input" id="guest-input-${tableId}" placeholder="Add a guest">
+            <button onclick="addGuestFromInline(${tableId})">Add Guest</button>
+        </div>
+        <div class="table-actions">
+            <button onclick="removeTable(${tableId})">Remove Table</button>
+        </div>
+    `;
 
-    function addBulkGuests() {
-        if (currentEvent) {
-            const bulkInput = document.getElementById("bulkGuestInput").value.trim();
-            const selectedTableId = parseInt(document.getElementById("bulkTableSelect").value);
+    // Insert the table section HTML into the page
+    tableSection.innerHTML = tableHTML;
+    tablesSection.appendChild(tableSection);
 
-            if (bulkInput && selectedTableId) {
-                const guestNames = bulkInput.split("\n").map(name => name.trim()).filter(name => name !== "");
-                const table = eventsData[currentEvent].tables.find(t => t.id === selectedTableId);
+    // Hide the loader after the content has been added
+    hideLoader();
+}
 
-                if (table) {
-                    table.guests.push(...guestNames);
-                    document.getElementById("bulkGuestInput").value = "";
-                    updateTableDisplay(selectedTableId);
-                    alert(`${guestNames.length} guest(s) added to Table ${selectedTableId}!`);
-                } else {
-                    alert("Table not found. Please select a valid table.");
-                }
+    async function addTable() {
+    if (currentEvent) {
+        const event = eventsData[currentEvent];
+
+        // Determine the new table ID based on the event's current tables
+        const newTableId = event.tables.length ? Math.max(...event.tables.map(t => t.id)) + 1 : 1;
+
+        // Prepare the table data to send to the API
+        const tableData = {
+            tables: [{ id: newTableId, guests: [] }]
+        };
+
+        try {
+            // Show loader during API call
+            showLoader(true);
+
+            // Make API call to add the table for the specific event
+            const response = await fetch(`http://localhost:3000/event/${currentEvent}/table`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(tableData)
+            });
+
+            // Handle the response from the server
+            if (response.ok) {
+                const data = await response.json();
+                console.log(data.message);  // Optionally, log success message
+                // Update the event data locally
+                eventsData[currentEvent] = data.events;
+                data.events.tables.forEach(table => {
+                createTable(data.id, data.guests);
+            }); // Create the table UI after the API responds
             } else {
-                alert("Please provide guest names and select a table.");
+                const error = await response.json();
+                alert(error.error);  // Display the error if something goes wrong
             }
-        } else {
-            alert("Please select or create an event first.");
+        } catch (error) {
+            console.error("Error adding table:", error);
+            alert("An error occurred while adding the table.");
+        } finally {
+            // Hide the loader after the API call completes
+            showLoader(false);
         }
+    } else {
+        alert("Please select or create an event first.");
+    }
+}
+
+    // Add head table
+    async function addHeadTable() {
+        // Handle head table creation (API call if needed)
     }
 
+    // Update table display after adding/removing guests
     function updateTableDisplay(tableId) {
         const table = eventsData[currentEvent].tables.find(t => t.id === tableId);
         const tableSection = document.querySelector(`[data-table-id="${tableId}"]`);
         const guestList = tableSection.querySelector(".guest-list");
         guestList.innerHTML = "";
 
-        table.guests.forEach(guest => {
+            table.guests.forEach(guest => {
+        // Check if the guest is a non-empty, non-null value
+        if (guest && guest.trim() !== "") {
             const guestHTML = `
                 <div class="guest-item">
                     <span class="guest-name">${guest}</span>
@@ -248,25 +463,255 @@
                 </div>
             `;
             guestList.innerHTML += guestHTML;
+        }
+    });
+
+    }
+
+    // Remove guest
+    async function removeGuest(tableId, guestName) {
+    if (currentEvent) {
+        try {
+            // Show loader during API call
+            showLoader(true);
+
+            // Make the API call to remove the guest from the table
+            const response = await fetch(`http://localhost:3000/event/${currentEvent}/table/${tableId}/guest/${guestName}`, {
+                method: 'DELETE',
+            });
+
+            // Handle the response from the server
+            if (response.ok) {
+                const data = await response.json();
+                console.log(data.message);  // Optionally, log success message
+                // Update the event data locally
+                eventsData[currentEvent] = data.events;
+                //updateTableDisplay(tableId);
+                switchEvent()  // Update the table UI after guest removal
+            } else {
+                const error = await response.json();
+                alert(error.error);  // Display error if something goes wrong
+            }
+        } catch (error) {
+            console.error("Error removing guest:", error);
+            alert("An error occurred while removing the guest.");
+        } finally {
+            // Hide the loader after the API call completes
+            showLoader(false);
+        }
+    } else {
+        alert("Please select or create an event first.");
+    }
+}
+
+    function populateTableSelect() {
+            const selectElement = document.getElementById('bulkTableSelect');
+            selectElement.innerHTML = '';  // Clear any existing options
+
+            // Loop through each event to add tables to the dropdown
+            eventsData.forEach(event => {
+                // Add the head table to the dropdown
+                const headTableOption = document.createElement('option');
+                headTableOption.value = event.headTable[0].id;
+                headTableOption.textContent = `Head Table ${event.headTable[0].id}`;
+                selectElement.appendChild(headTableOption);
+
+                // Add the other tables from this event
+                event.tables.forEach(table => {
+                    const tableOption = document.createElement('option');
+                    tableOption.value = table.id;
+                    tableOption.textContent = `Table ${table.id}`;
+                    selectElement.appendChild(tableOption);
+                });
+            });
+        }
+
+     // Edit a guest (show the modal with the current guest name)
+     function editGuest(tableId, guestName) {
+        currentTableId = tableId;
+        currentGuestName = guestName;
+
+        // Show the modal and pre-fill the guest name
+        document.getElementById('editGuestInput').value = guestName;
+        document.getElementById('editGuestModal').style.display = 'block';
+        document.getElementById('modalOverlay').style.display = 'block';
+    }
+
+    // Save the edited guest name
+    function saveGuestEdit() {
+        const newGuestName = document.getElementById('editGuestInput').value.trim();
+        if (newGuestName === '') {
+            alert('Guest name cannot be empty!');
+            return;
+        }
+
+        // Send the updated guest name to the server
+        fetch(`http://localhost:3000/event/1/table/${currentTableId}/guest/${encodeURIComponent(currentGuestName)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newGuestName: newGuestName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            // Update the UI after the guest is updated
+            //displayGuests(currentTableId, data.table.guests);
+            closeEditModal();
+            switchEvent();
+        })
+        .catch(error => {
+            alert('An error occurred while editing the guest.');
+            console.error(error);
         });
     }
 
-    function updateBulkTableSelect() {
-        const bulkTableSelect = document.getElementById("bulkTableSelect");
-        bulkTableSelect.innerHTML = '<option value="" disabled selected>Select a table</option>';
+    async function addGuestFromInline(tableId){
+            const guestInput = document.getElementById(`guest-input-${tableId}`).value.trim();
 
-        if (currentEvent) {
-            const event = eventsData[currentEvent];
-            event.tables.forEach(table => {
-                const option = document.createElement("option");
-                option.value = table.id;
-                option.textContent = `Table ${table.id}`;
-                bulkTableSelect.appendChild(option);
-            });
-        }
+    if (guestInput === '') {
+        alert('Please enter a guest name!');
+        return;
     }
 
-    window.onload = loadData;
+    // Send the guest data to the server
+    await fetch(`http://localhost:3000/event/${currentEvent}/table/${tableId}/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guests: [guestInput] })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert(data.message);
+            // Update the guests list UI
+            //displayGuests(tableId, data.table.guests);
+            document.getElementById(`guest-input-${tableId}`).value = ''; // Clear input field
+            switchEvent();
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while adding the guest.');
+        console.error(error);
+    });
+    }
+
+    // Close the edit modal without saving
+    function closeEditModal() {
+        document.getElementById('editGuestModal').style.display = 'none';
+        document.getElementById('modalOverlay').style.display = 'none';
+
+    }
+
+    function addBulkGuests() {
+        const guestInput = document.getElementById('bulkGuestInput').value.trim();
+        const selectedTableId = parseInt(document.getElementById('bulkTableSelect').value);
+
+        if (!guestInput || isNaN(selectedTableId)) {
+            alert('Please select a table and enter guest names.');
+            return;
+        }
+
+        // Split the guest names from textarea into an array
+        const guestNames = guestInput.split('\n').map(name => name.trim()).filter(name => name);
+
+        // Send the data to the server
+        fetch(`http://localhost:3000/event/${currentEvent}/table/${selectedTableId}/guest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ guests: guestNames })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(`Guests added to table ${selectedTableId}.`);
+            console.log(data);
+            switchEvent();
+        })
+        .catch(error => {
+            alert('An error occurred while adding guests.');
+            console.error(error);
+        });
+    }
+
+    function addHeadGuest() {
+    const guestInput = document.getElementById("headGuestInput").value.trim();
+    if (!guestInput) {
+        alert('Please enter a valid guest name.');
+        return;
+    }
+
+    // Send the new guest name to the backend via an API call
+    fetch(`http://localhost:3000/event/${currentEvent}/headTable/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guest: guestInput })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert(data.message);
+            displayHeadTable(data);  // Re-render the table with the updated guest list
+        }
+    })
+    .catch(error => {
+        console.error('Error adding guest:', error);
+        alert('An error occurred while adding the guest.');
+    });
+}
+
+// Function to edit a guest in the Head Table
+function editHeadGuest(guestName) {
+    const newGuestName = prompt('Enter the new name for the guest:', guestName);
+    if (!newGuestName || newGuestName.trim() === "") {
+        alert('Guest name cannot be empty!');
+        return;
+    }
+
+    // Send the updated guest name to the backend via an API call
+    fetch(`http://localhost:3000/event/${currentEvent}/table/0/guest/${encodeURIComponent(guestName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newGuestName: newGuestName })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert(data.message);
+            displayHeadTable(data);  // Re-render the table with the updated guest list
+        }
+    })
+    .catch(error => {
+        console.error('Error editing guest:', error);
+        alert('An error occurred while editing the guest.');
+    });
+}
+
+// Function to remove a guest from the Head Table
+function removeHeadGuest(guestName) {
+    if (!confirm(`Are you sure you want to remove ${guestName}?`)) {
+        return;  // Cancel the removal if the user clicks "Cancel"
+    }
+
+    // Send the request to remove the guest from the backend
+    fetch(`http://localhost:3000/event/${currentEvent}/headTable/guest/${encodeURIComponent(guestName)}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            alert(data.message);
+            displayHeadTable(data);  // Re-render the table with the updated guest list
+        }
+    })
+    .catch(error => {
+        console.error('Error removing guest:', error);
+        alert('An error occurred while removing the guest.');
+    });
+}
+    // Call the loadEventsIntoDropdown function when the page loads
+window.onload = function() {
+    loadEventsIntoDropdown('http://localhost:3000/events', 'eventSelect');
+};
 </script>
 
 </body>
