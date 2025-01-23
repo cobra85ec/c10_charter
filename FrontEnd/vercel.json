@@ -2,19 +2,19 @@
     "version": 2,
     "builds": [
       {
-        "src": "index.html",
+        "src": "newadmin.html",
         "use": "@vercel/static"
       },
       {
-        "src": "second.html",
+        "src": "GuestView.html",
         "use": "@vercel/static"
       },
       {
-        "src": "style.css",
+        "src": "styles.css",
         "use": "@vercel/static"
       },
       {
-        "src": "secondStyle.css",
+        "src": "loader.css",
         "use": "@vercel/static"
       }
     ]
